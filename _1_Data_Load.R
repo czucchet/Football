@@ -46,13 +46,10 @@ get_PL_fixture = function(start, end, league = "ALL",...){
     }
   }
       
-get_PL_games = function(year){
+get_PL_games = function(){
   library(rvest);library(tidyverse);library(DBI);library(RSQLite);library(purrr);library(zoo);library(stringr)
   con = dbConnect(SQLite(), "Football_Records.sqlite")
-  year_query = "SELECT * FROM Fixture_Detail WHERE Season_ID = '2017-2018'"
-  test =  dbGetQuery(con, year_query)
   all_fixtures =  dbGetQuery(con, "SELECT * FROM Fixture_Detail")
-  all_fixtures =  dbGetQuery(con, year_query)  
   for(i in 1:length(all_fixtures$web_ID)){
   game = read_html(all_fixtures$web_ID[i]) %>% html_table(fill = TRUE)
   select_game = sapply(game, function(x) nrow(x));find_game = which(select_game > 12 & select_game < 22)
@@ -91,6 +88,16 @@ get_PL_games = function(year){
         }
       }
     }
+
+
+get_PL_player_stats = function(){
+  library(rvest);library(tidyverse);library(DBI);library(RSQLite);library(purrr);library(zoo);library(stringr)
+  con = dbConnect(SQLite(), "Football_Records.sqlite")
+  all_player_games =  dbGetQuery(con, "SELECT * FROM Player_Game_Detail")
+  
+  
+    
+  }
 
 all_records_temp =  dbGetQuery(con, "SELECT * FROM Player_Game_Detail")
 test =  dbGetQuery(con, "SELECT * FROM Fixture_Detail")
