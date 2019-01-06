@@ -156,8 +156,6 @@ get_PL_metadata()
 
 
 
-
-
 dbListTables(con)
 dbRemoveTable(con,"Fixture_Detail")
 dbRemoveTable(con,"Player_Game_Detail")
