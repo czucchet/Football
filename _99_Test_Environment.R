@@ -3,20 +3,38 @@ get_PL_season_stats = function() {
   con = dbConnect(SQLite(), "Football_Records.sqlite")
   all_player_games =  dbGetQuery(con, "SELECT * FROM Player_Game_Detail")
   dis_rows = all_player_games %>% select(Player,Team,SeasonID) %>% distinct() %>% nrow()
-  distinct_players = all_player_games %>% select(Player,Team,SeasonID) %>% distinct() %>%
+  distinct_players_t = all_player_games %>% select(Player,Team,SeasonID) %>% distinct() %>%
     mutate(Player_New  = str_replace_all(Player," ","-"),
            Player_Link = paste0("https://www.worldfootball.net/player_summary/",str_replace_all(Player," ","-"), "/2/")
+<<<<<<< HEAD
     )
+=======
+    );distinct_players = distinct_players_t[1:10,]
+  #distinct_players = distinct_players_temp[start:end,]
+>>>>>>> 46da96bd28807f3dce3cd7d6358d5ba06f4c0698
   for(i in 1:length(distinct_players$Player_Link)){
     games = read_html(distinct_players$Player_Link[i]) %>% html_table(fill = TRUE)
     get_matches = sapply(games, function(x) nrow(x));get_matches_cols = sapply(games, function(x) ncol(x))
     find_season_data = which(get_matches > 0 & get_matches_cols == 12)
+<<<<<<< HEAD
     if(length(find_season_data) != 0){
       season_data = data.frame(games[find_season_data]); names(season_data)  = c("League_Icon", "League", "Season", "Team", "Matches", "Goals", "Starts", "Sub_In", "Sub_Out", "Yellows", "Two_Yellows","Red")
       season_data$League = str_replace_all(str_replace_all(season_data$League, "[\r\n\t]" , ""), "[[:punct:]]", "")
       season_data$Player_Name = distinct_players$Player_New[i];season_data$Player_Link = distinct_players$Player_Link[i]
       season_data = season_data %>% select(-League_Icon)
         }
+=======
+#    if(sum(is.na(data.frame(games[find_season_data])$X1)) != length(is.na(data.frame(games[find_season_data])$X1))){ 
+#      if((which(data.frame(games[find_metadata])$X1 == "Born:") == 1 & length(data.frame(games[find_metadata])$X1 == 7)) |
+#         nrow(data.frame(games[find_metadata])) >= 9  &
+#         length(data.frame(games[find_metadata])$X1[which(str_detect(data.frame(games[find_metadata])$X1, "Born"))]) > 0
+#      ){
+        season_data = data.frame(games[find_season_data]); names(season_data)  = c("League_Icon", "League", "Season", "Team", "Matches", "Goals", "Starts", "Sub_In", "Sub_Out", "Yellows", "Two_Yellows","Red")
+        season_data$League = str_replace_all(str_replace_all(season_data$League, "[\r\n\t]" , ""), "[[:punct:]]", "")
+        season_data$Player_Name = distinct_players$Player_New[i];season_data$Player_Link = distinct_players$Player_Link[i]
+#      } 
+    }
+>>>>>>> 46da96bd28807f3dce3cd7d6358d5ba06f4c0698
     do_DB_Season_Stats = function() {
       db_check = try(dbGetQuery(con, "SELECT * FROM Player_Season_Data"),silent = TRUE)
       if(class(db_check) == "try-error"){
@@ -34,7 +52,10 @@ get_PL_season_stats = function() {
     }
 #  }
   do_DB_Season_Stats()
+<<<<<<< HEAD
   }
+=======
+>>>>>>> 46da96bd28807f3dce3cd7d6358d5ba06f4c0698
   test <<- distinct_players
 }
 

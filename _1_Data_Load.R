@@ -155,6 +155,7 @@ get_PL_metadata = function() {
 get_PL_metadata()
 
 
+<<<<<<< HEAD
 get_PL_season_stats = function() {
   library(rvest);library(tidyverse);library(DBI);library(RSQLite);library(purrr);library(zoo);library(stringr);library(BBmisc)
   con = dbConnect(SQLite(), "Football_Records.sqlite")
@@ -196,6 +197,8 @@ get_PL_season_stats = function() {
 }
 get_PL_season_stats()
 
+=======
+>>>>>>> 46da96bd28807f3dce3cd7d6358d5ba06f4c0698
 
 dbListTables(con)
 dbRemoveTable(con,"Fixture_Detail")
