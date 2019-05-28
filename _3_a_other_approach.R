@@ -6,7 +6,7 @@ Fixture_Detail =  dbGetQuery(con, "SELECT * FROM Fixture_Detail")
 Player_Game_Detail =  dbGetQuery(con, "SELECT * FROM Player_Game_Detail") %>% 
   mutate(Player_Name_Season = paste0(Player,"_", substr(SeasonID,1,4)))
 Player_Metadata =  dbGetQuery(con, "SELECT * FROM Player_Metadata")
-Player_Season =  dbGetQuery(con, "SELECT * FROM Player_Season_Data")
+Player_Season =  dbGetQuery(con, "SELECT * FROM Player_Season_Data");dim(Player_Season)
 head(Fixture_Detail);head(Player_Game_Detail);head(Player_Metadata);head(Player_Season)
 
 temp_train = Fixture_Detail %>% select(Day_of_Game,Time_of_Game,Home_Team,Away_Team,Season_Start,Season_End,Winner) %>%
@@ -45,21 +45,18 @@ pl_player_summ_t = Player_Season %>% filter(League == "Pr League") %>%
   group_by(Player_Link,Season_short,Team,Player_Key,Player_Name) %>%
   summarise(pl_mins = sum(mins_per_league),pl_n_matches = sum(Matches),pl_goals = sum(Goals)
   ) %>% 
-  data.frame() %>% arrange(desc(Season_short)) 
-# %>% select(-Player_Link,-Season_short,-Team) 
+  data.frame() %>% arrange(desc(Season_short)) %>% select(-Player_Link,-Season_short,-Team) 
 
-Player_Season %>% filter(Player_Name == "Luis Suárez")
 player_summ_t %>% filter(Player_Name == "Luis Suárez")
-
-player_summ_t2 =   left_join(player_summ_t, Player_Results_T) 
-
-  head(player_summ_t2,10)
+player_summ_t4 %>% filter(Player_Name == "Siem de-Jong")
+player_summ_t2[is.na(player_summ_t2)] <- 0
 
 
 
-player_summ_t2 =  left_join(player_summ_t,pl_player_summ_t);player_summ_t2[is.na(player_summ_t2)] <- 0
-player_summ_t3 = player_summ_t2 %>% mutate(Player_Key = paste0(Player_Name, "_",Season_short,"_",Team),
-                                           Season = substr(Season_short,1,4)) %>% select(-Player_Link,Season_short,-Team,-player_key)
+player_summ_t3 =  left_join(player_summ_t2,pl_player_summ_t);player_summ_t3[is.na(player_summ_t3)] <- 0
+player_summ_t4 = player_summ_t3 %>% mutate(Player_Key = paste0(Player_Name, "_",Season_short,"_",Team),
+                                           Season = substr(Season_short,1,4)) %>% select(-Player_Link,Season_short,-Team,-Player_Key)
+player_summ_t4 %>% filter(Player_Name == "Siem de-Jong")
 ##### Selection for which seasons in scope placed here ###############
 
 #best used for player_summ_t3 
