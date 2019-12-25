@@ -1,4 +1,4 @@
-library(tidyverse);library(magrittr);library(RSQLite);library(stringr);library(h2o)
+library(tidyverse);library(magrittr);library(RSQLite);library(stringr);library(h2o);library(caroline)
 
 con = dbConnect(SQLite(), "Football_Records.sqlite")
 dbListTables(con)
@@ -7,10 +7,36 @@ Player_Game_Detail =  dbGetQuery(con, "SELECT * FROM Player_Game_Detail")
 Player_Metadata =  dbGetQuery(con, "SELECT * FROM Player_Metadata")
 Player_Season =  dbGetQuery(con, "SELECT * FROM Player_Season_Data")
 head(Fixture_Detail);head(Player_Game_Detail);head(Player_Metadata);head(Player_Season)
+write.delim(Fixture_Detail,"Fixture_Detail.txt", sep = "~");write.delim(Player_Game_Detail,"Player_Game_Detail.txt", sep = "~");write.delim(Player_Metadata,"Player_Metadata.txt", sep = "~");write.delim(Player_Season,"Player_Season.txt", sep = "~")
 
 temp_train = Fixture_Detail %>% select(Day_of_Game,Time_of_Game,Home_Team,Away_Team,Season_Start,Season_End,Winner) %>%
   mutate(Season_short = paste0(Season_Start,"/",Season_End))
 head(temp_train);write.csv(temp_train,'temp_train.csv')
+
+###### Use fixture data to create aggregate points  #############
+Fixture_Detail_t =  Fixture_Detail %>% mutate(Home_Points = ifelse(Winner == "Home", 3,ifelse(Winner == "Draw", 1,0)),
+                           Away_Points = ifelse(Winner == "Home", 0,ifelse(Winner == "Draw", 1,3)),
+                           Day_of_Game = as.POSIXct(Day_of_Game, format = "%d/%m/%Y")) %>% arrange(Day_of_Game)
+
+Fixture_Detail_t2 =  bind_rows(Fixture_Detail_t, Fixture_Detail_t) %>% 
+                     mutate(Team =  c(Fixture_Detail_t$Home_Team,Fixture_Detail_t$Away_Team), Round_No = as.numeric(Round_No),
+                            Act_Points = ifelse(Home_Team == Team, Home_Points, Away_Points)) %>% arrange(Team, Season_ID, Round_No) %>% 
+                    mutate(TS_Key = paste0(Team, "_",Season_ID)) 
+Fixture_Detail_t3 = Fixture_Detail_t2 %>% split(.$TS_Key)
+for(i in 1:length(Fixture_Detail_t3)){
+  Fixture_Detail_t3[[i]]$running_points = cumsum(Fixture_Detail_t3[[i]]$Act_Points)
+  Fixture_Detail_t3[[i]]$last_rd_pts = lag(Fixture_Detail_t3[[i]]$running_points,1)
+    }
+Fixture_Detail_t4 = bind_rows(Fixture_Detail_t3) %>%
+  mutate(TSR_Key = paste0(TS_Key, "_",Round_No),
+         Home_Team_key = paste0(Home_Team, "_",Season_ID,"_",Round_No),Away_Team_key = paste0(Away_Team, "_",Season_ID,"_",Round_No)) %>% select(-TS_Key)
+Fixture_Detail_t4[is.na(Fixture_Detail_t4)] <- 0 
+H_Team_Results =Fixture_Detail_t4 %>% select(TSR_Key,last_rd_pts) %>% rename(ht_last_rd_pts = last_rd_pts);
+A_Team_Results =Fixture_Detail_t4 %>% select(TSR_Key,last_rd_pts) %>% rename(at_last_rd_pts = last_rd_pts)
+Fixture_Detail_t5 = Fixture_Detail_t4 %>% select(-TSR_Key) 
+Fixture_Detail_t5 = left_join(Fixture_Detail_t5,H_Team_Results, by = c("Home_Team_key" = "TSR_Key"))
+Fixture_Detail_t6 = left_join(Fixture_Detail_t5,A_Team_Results, by = c("Away_Team_key" = "TSR_Key"))
+
 
 ###### Create player summaries to take up to game level #############
 player_summ_t =   Player_Season %>%
@@ -37,32 +63,14 @@ player_summ_t3 = player_summ_t2 %>% mutate(Player_Key = paste0(Player_Name, "_",
 head(player_summ_t3)
 ##### Selection for which seasons in scope placed here ###############
 
-#most_recent = 2016
-player_summ_t4 = player_summ_t3 %>%
-  filter(Season >= 2014 & Season <= 2016) %>%
-  mutate(team_ID = paste0(sapply(strsplit(Player_Key,"_",fixed = T), `[`, 1),"_", sapply(strsplit(Player_Key,"_",fixed = T), `[`, 3))) %>%
-  group_by(Player_Name) %>%
-  summarise(n_teams = length(unique(team_ID)),
-            sum_mins = sum(mins),sum_pl_mins = sum(pl_mins),
-            sum_goals = sum(goals),sum_pl_goals = sum(pl_goals),
-            avg_diff_leagues = mean(diff_leagues),mins_pl_ratio = round(sum(pl_mins)/sum(mins),2),goals_pl_ratio = round(sum(pl_goals)/sum(goals),2)
-                        ) %>% data.frame();player_summ_t4[is.na(player_summ_t4)] <- 0
 
-player_summ_t5 = player_summ_t3 %>%
-  filter(Season == most_recent ) %>%
-  mutate(team_ID = paste0(sapply(strsplit(Player_Key,"_",fixed = T), `[`, 1),"_", sapply(strsplit(Player_Key,"_",fixed = T), `[`, 3))) %>%
-  group_by(Player_Name) %>%
-  summarise(mr_n_teams = length(unique(team_ID)),mr_sum_mins = sum(mins),mr_sum_pl_mins = sum(pl_mins),mr_sum_goals = sum(goals),mr_sum_pl_goals = sum(pl_goals),
-            mr_avg_diff_leagues = mean(diff_leagues),mr_mins_pl_ratio = round(sum(pl_mins)/sum(mins),2),mr_goals_pl_ratio = round(sum(pl_goals)/sum(goals),2)
-  ) %>% data.frame();player_summ_t5[is.na(player_summ_t5)] <- 0
 
-player_summ = left_join(player_summ_t5,player_summ_t4, by = "Player_Name") %>% na.omit() ;player_summ[is.na(player_summ)] <- 0
 
-Player_Game_Detail_17 = Player_Game_Detail %>% filter(SeasonID == "2017/2018")
 
-Player_Game_Detail_17_t = left_join(Player_Game_Detail_17, player_summ, by =c("Player" ="Player_Name")) %>% na.omit()
 
-head(Player_Game_Detail_17_t)
+
+
+
 
 ##### Define which teams are at home in any game, and which are away #####
 
