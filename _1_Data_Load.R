@@ -1,4 +1,8 @@
-get_PL_fixture = function(start, end, league = "ALL",...){
+start = 11
+end = 2020
+dbListTables(con)
+dbRemoveTable(con,"Fixture_Detail")
+get_PL_fixture = function(start, end, ...){
   library(rvest);library(tidyverse);library(DBI);library(RSQLite);library(purrr);library(zoo);library(stringr)
   if(end <= start){
     stop("Start year argument must be prior to end year")
@@ -6,8 +10,11 @@ get_PL_fixture = function(start, end, league = "ALL",...){
   con = dbConnect(SQLite(), "Football_Records.sqlite")
   understand_no_years = end - start 
   start_vec = start:end; end_vec = (start+1):(end+1)
-  years_in_scope = data.frame(start_year = start_vec,end_year = end_vec) %>% filter(end_year<=end) %>% 
-    mutate(years =  paste0("https://www.worldfootball.net/all_matches/eng-premier-league-",start_year,"-",end_year,"/")) 
+  epl_years_in_scope = data.frame(start_year = start_vec,end_year = end_vec) %>% filter(end_year<=end) %>% 
+    mutate(years =  paste0("https://www.worldfootball.net/all_matches/eng-premier-league-",start_year,"-",end_year,"/"), title = "EPL") 
+  champ_years_in_scope = data.frame(start_year = start_vec,end_year = end_vec) %>% filter(end_year<=end) %>% 
+    mutate(years =  paste0("https://www.worldfootball.net/all_matches/eng-championship-",start_year,"-",end_year,"/"), title = "Championship") 
+  years_in_scope = bind_rows(epl_years_in_scope,champ_years_in_scope)
   for(i in 1:length(years_in_scope$years)){
     line_up = read_html(years_in_scope$years[i]) %>% html_table(fill = TRUE)
     select_fixture = sapply(line_up, function(x) nrow(x));find_fixture = which(select_fixture > 1)
@@ -24,6 +31,7 @@ get_PL_fixture = function(start, end, league = "ALL",...){
              Teams_ID = str_replace_all(paste0(str_replace_all(Home_Team, " ","-"),Dash,str_replace_all(Away_Team, " ","-"),"/"), "&-",""),
              Season_Start = years_in_scope$start_year[i],
              Season_End = years_in_scope$end_year[i],
+             Title = years_in_scope$title[i],
              web_ID = paste0("https://www.worldfootball.net/report/premier-league-",Season_Start,"-",Season_End,"-",Teams_ID)) %>% 
       mutate(FT_Home = as.numeric(FT_Home),FT_Away = as.numeric(FT_Away),
              Winner = ifelse(FT_Home > FT_Away, "Home",ifelse(FT_Home < FT_Away, "Away", "Draw")),
@@ -45,37 +53,47 @@ get_PL_fixture = function(start, end, league = "ALL",...){
       }
     }
   }
-get_PL_fixture(2005,2018)
+get_PL_fixture(1990,2020) # going back further than 
+Fixture_Detail =  dbGetQuery(con, "SELECT * FROM Fixture_Detail")
+table(Fixture_Detail[Fixture_Detail$Title == "EPL","Season_ID"]) # For EPL only analysis
+table(Fixture_Detail$Season_ID)
 
 get_PL_games = function(){
   library(rvest);library(tidyverse);library(DBI);library(RSQLite);library(purrr);library(zoo);library(stringr)
   con = dbConnect(SQLite(), "Football_Records.sqlite")
-  dbRemoveTable(con, "Player_Game_Detail")
   all_fixtures =  dbGetQuery(con, "SELECT * FROM Fixture_Detail")
   for(i in 1:length(all_fixtures$web_ID)){
   game = read_html(all_fixtures$web_ID[i]) %>% html_table(fill = TRUE)
-  select_game = sapply(game, function(x) nrow(x));find_game = which(select_game > 12 & select_game < 22)
+  select_game = sapply(game, function(x) nrow(x));find_game = which(select_game >= 11 & select_game < 22)
   game_temp = game[find_game]
-  if(length(game_temp) != 0) {
+  if(length(game_temp) == 2) {
   names(game_temp[[1]]) = c("Number","Player","Subbed_Time")
   game_temp[[1]] = game_temp[[1]] %>% 
     mutate(Is_Starting = 1,Team = rep(all_fixtures[i, "Home_Team"], nrow(game_temp[[1]])),Is_Home = 1,
            GameID = rep(all_fixtures[i,"web_ID"],nrow(game_temp[[1]])),SeasonID = rep(all_fixtures[i,"Season_ID"],nrow(game_temp[[1]])),
-           Player_Link = paste0("https://www.worldfootball.net/player_summary/",str_replace_all(Player," ","-"), "/2/")
+           Player_Link = paste0("https://www.worldfootball.net/player_summary/",str_replace_all(Player," ","-"), "/2/"),
+           Number = as.character(Number),Subbed_Time = as.character(Subbed_Time)
           )
-    game_temp[[1]][which(str_sub(game_temp[[1]]$Subbed_Time,1,3) == "Sub"):nrow(game_temp[[1]]),"Is_Starting"] <- 0
+    if(nrow(game_temp[[1]]) > 11){
+      game_temp[[1]][which(str_sub(game_temp[[1]]$Subbed_Time,1,3) == "Sub"):nrow(game_temp[[1]]),"Is_Starting"] <- 0
+      }
     game_temp[[1]]$Player = str_replace_all(game_temp[[1]]$Player, "[\r\n\t]" , "")
 
     names(game_temp[[2]]) = c("Number","Player","Subbed_Time")
     game_temp[[2]] = game_temp[[2]] %>% 
       mutate(Is_Starting = 1,Team = rep(all_fixtures[i, "Away_Team"], nrow(game_temp[[2]])),Is_Home = 0,
              GameID = rep(all_fixtures[i,"web_ID"],nrow(game_temp[[2]])),SeasonID = rep(all_fixtures[i,"Season_ID"],nrow(game_temp[[2]])),
-             Player_Link = paste0("https://www.worldfootball.net/player_summary/",str_replace_all(Player," ","-"), "/2/")
+             Player_Link = paste0("https://www.worldfootball.net/player_summary/",str_replace_all(Player," ","-"), "/2/"),
+             Number = as.character(Number),Subbed_Time = as.character(Subbed_Time)
       )
-    game_temp[[2]][which(str_sub(game_temp[[2]]$Subbed_Time,1,3) == "Sub"):nrow(game_temp[[2]]),"Is_Starting"] <- 0
-    game = bind_rows(game_temp)
-    game = game[game$Subbed_Time != "Substitutes",] 
+    if(nrow(game_temp[[2]]) > 11){
+      game_temp[[2]][which(str_sub(game_temp[[2]]$Subbed_Time,1,3) == "Sub"):nrow(game_temp[[2]]),"Is_Starting"] <- 0
+    }
+    game_temp[[2]]$Player = str_replace_all(game_temp[[2]]$Player, "[\r\n\t]" , "")
+    
+    game = bind_rows(game_temp) %>% filter(Number != "Substitutes") %>% mutate(Subbed_Time = ifelse(is.na(Subbed_Time), " ",Subbed_Time))
     game$Player = gsub('[0-9]+', '',str_replace_all(str_replace_all(game$Player, "[\r\n\t]" , ""), "[[:punct:]]", ""))
+    game$Player_Link = ifelse(str_detect(game$Player_Link, "\n"),paste0(sapply(strsplit(game$Player_Link,"\n",fixed = T), `[`, 1),"/2/"),game$Player_Link)
     game$Player_Key = paste0(game$Player,"_",game$Team,"_",game$SeasonID)
     db_check = try(dbGetQuery(con, "SELECT * FROM Player_Game_Detail"),silent = TRUE)
     if(class(db_check) == "try-error"){
@@ -99,6 +117,7 @@ get_PL_games()
 get_PL_metadata = function() {
   library(rvest);library(tidyverse);library(DBI);library(RSQLite);library(purrr);library(zoo);library(stringr);library(BBmisc)
   con = dbConnect(SQLite(), "Football_Records.sqlite")
+  # commd out due to re-run of fixture from start  dbRemoveTable(con, "Player_Game_Detail")
   all_player_games =  dbGetQuery(con, "SELECT * FROM Player_Game_Detail")
   dis_rows = all_player_games %>% select(Player,Team,SeasonID) %>% distinct() %>% nrow()
   distinct_players = all_player_games %>% select(Player,Team,SeasonID) %>% distinct() %>%
@@ -162,6 +181,7 @@ get_PL_metadata()
 get_PL_season_stats = function() {
   library(rvest);library(tidyverse);library(DBI);library(RSQLite);library(purrr);library(zoo);library(stringr);library(BBmisc)
   con = dbConnect(SQLite(), "Football_Records.sqlite")
+  # commd out due to re-run of fixture from start  dbRemoveTable(con, "Player_Game_Detail")
   all_player_games =  dbGetQuery(con, "SELECT * FROM Player_Game_Detail")
   dis_rows = all_player_games %>% select(Player,Team,SeasonID) %>% distinct() %>% nrow()
   distinct_players = all_player_games %>% select(Player,Team,SeasonID) %>% distinct() %>%
@@ -201,8 +221,11 @@ get_PL_season_stats = function() {
 }
 get_PL_season_stats()
 
-
+con = dbConnect(SQLite(), "Football_Records.sqlite")
 dbListTables(con)
 Fixture_Detail =  dbGetQuery(con, "SELECT * FROM Fixture_Detail");
 
 
+ls(package:DBI)
+
+dbListTables(con)

@@ -47,6 +47,10 @@ pl_player_summ_t = Player_Season %>% filter(League == "Pr League") %>%
   ) %>% 
   data.frame() %>% arrange(desc(Season_short)) %>% select(-Player_Link,-Season_short,-Team) 
 
+
+head(player_summ_t)
+
+
 player_summ_t %>% filter(Player_Name == "Luis Suárez")
 player_summ_t4 %>% filter(Player_Name == "Siem de-Jong")
 player_summ_t2[is.na(player_summ_t2)] <- 0

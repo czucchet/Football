@@ -18,3 +18,5 @@ dim(Fixture_Detail);head(Fixture_Detail)
 dim(Player_Game_Detail);head(Player_Game_Detail)
 dim(Player_Metadata);head(Player_Metadata)
 dim(Player_Metadata);head(Player_Metadata)
+
+dbRemoveTable(con, "Player_Season_Data")
